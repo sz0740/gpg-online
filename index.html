@@ -96,7 +96,7 @@ function getKey(textarea, type) {
   if (!value) {
     throw new Error(`${type} key missing`);
   }
-  return openpgp.key.readArmored(value).keys[0];
+  return openpgp.key.readArmored(value);
 }
 
 function getPrivateKey() {
@@ -109,16 +109,16 @@ function getPrivateKey() {
     privateKey: getKey(key, 'private'),
     passphrase: passphrase.value,
   })
-  .then(({key}) => key)
   ;
 }
 
 query('#encrypt').addEventListener('click', () => {
-  getPrivateKey().then(privateKey => {
+  const pkeys = queryAll('.public-key textarea').map(el => getKey(el, 'public'));
+  Promise.all([...pkeys, getPrivateKey()]).then(results => {
     const options = {
-      data: query('.message textarea').value,
-      publicKeys: queryAll('.public-key textarea').map(el => getKey(el, 'public')),
-      privateKey: privateKey,
+      message: openpgp.message.fromText(query('.message textarea').value),
+      publicKeys: [results[0].keys[0]],
+      privateKey: results[1],
       armor: true,
     };
 
@@ -126,7 +126,7 @@ query('#encrypt').addEventListener('click', () => {
       query('#output').innerHTML = results.data;
     });
   })
-  .catch(err => alert(err.message))
+  .catch(err => console.log(err))
   ;
 });
 </script>
