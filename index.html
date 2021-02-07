@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>GPG Online</title>
-  <script src="openpgp.min.js"></script>
+  <title>PGP Encryption Online</title>
   <style type="text/css">
     body, button, textarea, pre {
       font-family: Consolas;
@@ -13,6 +12,8 @@
       border: 1px solid silver;
       border-radius: 3px;
       padding: 0.2rem;
+      font-size: 0.8rem;
+      margin-top: 1rem;
     }
 
     button {
@@ -20,120 +21,98 @@
       border: 1px solid black;
       background: white;
       cursor: pointer;
-      padding: 3px 5px 1px 5px;
+      padding: 3px 1rem 3px 1rem;
+      border-radius: 1rem;
+      outline-style: none;
     }
 
-    pre, textarea, input {
-      font-size: 0.8rem;
+    button:active {
+      animation-name: buttonclick;
+      animation-duration: 0.5s;
     }
 
-    h2 {
-      margin: 0;
-      font-weight: normal;
+    footer {
+      margin-top: 1rem;
+      font-size: 0.75rem;
     }
 
-    #private-key {
-      display: none;
-    }
-
-    #private-key.visible {
-      display: block;
-    }
-
-    .hint {
-      font-size: 0.7rem;
-      margin: 0;
-      color: gray;
+    @keyframes buttonclick {
+      50% { background-color: gray;}
+      100% { background-color: black;}
     }
   </style>
 </head>
 <body>
 
-<h1>GPG Online</h1>
+<h1>Encrypt message with OpenPGP.js</h1>
 
 <div class="message">
-  <h2>Message to encrypt</h2>
-  <textarea rows="5"></textarea>
+  <textarea name="plaintext" placeholder="Type in or paste message to be encrypted here..." rows="8"></textarea>
 </div>
 
-<div id="public-keys">
-  <div class="public-key">
-    <h2>Public key</h2>
-    <p class="hint">Only the person who has a private key will be able to decrypt the message.</p>
-    <textarea rows="5"></textarea>
+<div class="message">
+  <textarea name="pubkey" placeholder="The recipient's PGP public key" rows="5"></textarea>
+</div>
+
+<div class="buttons">
+  <button id="load-default-key">Use my key</button>
+  <button id="encrypt">Encrypt</button>
+  Find more keys <a href="http://keys.gnupg.net/" target="_blank">here</a> 
+  or <a href="https://pgp.mit.edu/" target="_blank">here</a>
+</div>
+
+<div class="message">
+  <textarea id="output" rows="10" placeholder="Encrypted message will be here." disabled></textarea>
+  <div>
+    <button id="copy-output">Copy to clipboard</button>
   </div>
 </div>
 
-<div id="private-key">
-  <h2>Private Key</h2>
-  <textarea rows="5"></textarea>
-  <h2>Passphrase</h2>
-  <textarea rows="2"></textarea>
-</div>
+<footer>
+  This page uses industry vetted open source <a href="https://github.com/openpgpjs/openpgpjs">OpenPGP.js</a> and does not submit anything to the server. Everything happens in your browser and is completely lost when you close this page.
+</footer>
 
-<pre id="output"></pre>
-<button id="encrypt">Encrypt</button>
-<button id="add-public-key">Add Public Key</button>
-<button id="add-private-key">Add Private Key</button>
+<script src="openpgp.min.js"></script>
 
 <script>
-const query = query => document.querySelector(query);
-const queryAll = query => Array.prototype.slice.apply(document.querySelectorAll(query));
-const publicKeyTemplate = query('#public-keys').innerHTML;
+const q = selector => document.querySelector(selector);
 
-query('#add-public-key').addEventListener('click', () => {
-  const element = document.createElement('div');
-  element.innerHTML = publicKeyTemplate;
-  query('#public-keys').appendChild(element);
-});
-
-query('#add-private-key').addEventListener('click', () => {
-  query('#private-key').className = 'visible';
-});
-
-function getKey(textarea, type) {
-  const { value } = textarea;
-  if (!value) {
-    throw new Error(`${type} key missing`);
-  }
-  return openpgp.key.readArmored(value);
-}
-
-function getPrivateKey() {
-  if (query('#private-key').className !== 'visible') {
-    return Promise.resolve();
-  }
-
-  const [key, passphrase] = queryAll('#private-key textarea');
-  return openpgp.decryptKey({
-    privateKey: getKey(key, 'private'),
-    passphrase: passphrase.value,
-  })
-  ;
-}
-
-query('#encrypt').addEventListener('click', () => {
-  const pkeys = queryAll('.public-key textarea').map(el => getKey(el, 'public'));
-  Promise.all([...pkeys, getPrivateKey()]).then(results => {
-    const options = {
-      message: openpgp.message.fromText(query('.message textarea').value),
-      publicKeys: [results[0].keys[0]],
-      privateKey: results[1],
+q('#encrypt').addEventListener('click', () => {
+  openpgp.key.readArmored(q('textarea[name=pubkey]').value)
+  .then(
+    results => openpgp.encrypt({
+      message: openpgp.message.fromText(q('textarea[name=plaintext]').value),
+      publicKeys: results.keys[0],
       armor: true,
-    };
-
-    return openpgp.encrypt(options).then(results => {
-      query('#output').innerHTML = results.data;
-    });
-  })
-  .catch(err => console.log(err))
-  ;
+    })
+    )
+  .then(
+    results => q('#output').value = results.data
+    )
+  .catch(
+    err => console.log(err)
+    );
 });
-</script>
 
-<p>
-  This page uses industry vetted open source <a href="https://github.com/openpgpjs/openpgpjs">OpenPGP.js</a> and does not submit anything to the server. Everything happens in your browser and is completely lost when you close this page.
-</p>
+q('#load-default-key').addEventListener('click', () => {
+  fetch('sz0740.pem')
+  .then(response => response.text())
+  .then(data => q('textarea[name=pubkey').value = data)
+  .catch(
+    err => console.log(err)
+  )
+});
+
+q('#copy-output').addEventListener('click', () => {
+  let output = q('#output');
+  output.disabled = false;
+  output.focus();
+  output.select();
+  document.execCommand('copy');
+  output.disabled = true;
+});
+
+</script>
 
 </body>
 </html>
