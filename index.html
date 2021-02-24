@@ -62,10 +62,13 @@
 </div>
 
 <div class="message">
-  <textarea id="output" rows="10" placeholder="Encrypted message will be here." disabled></textarea>
-  <div>
-    <button id="copy-output">Copy to clipboard</button>
-  </div>
+  <form action="mailto:recipient@example.com" target="_blank" method="get">
+    <textarea id="output" name="body" rows="10" placeholder="Encrypted message will be here." disabled></textarea>
+    <div>
+      <button type="button" id="copy-output">Copy to clipboard</button>
+      <button type="submit">Email</button>
+    </div>
+  </form>
 </div>
 
 <footer>
@@ -112,6 +115,11 @@ q('#copy-output').addEventListener('click', () => {
   output.disabled = true;
 });
 
+q('form').addEventListener('submit', () => {
+  let output = q('#output');
+  output.disabled = false;
+  setTimeout(() => { output.disabled = true;}, 1000);
+});
 </script>
 
 </body>
